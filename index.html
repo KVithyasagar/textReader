@@ -24,7 +24,7 @@
       border-radius: 20px;
       width: 90%;
       max-width: 400px;
-      max-height: 90vh; /* Allow scrolling on small screens */
+      max-height: 90vh; /* Allow scrolling */
       overflow-y: auto;
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
       text-align: center;
@@ -33,7 +33,7 @@
     .logo-container { 
         margin-bottom: 20px; 
         animation: bounce 2s infinite; 
-        height: 70px; /* Fixed height to prevent jumps */
+        height: 70px; 
         display: flex;
         justify-content: center;
         align-items: center;
@@ -43,7 +43,7 @@
         height: 70px;
         width: 70px;
         object-fit: contain;
-        border-radius: 50%; /* Optional: makes square images round */
+        border-radius: 50%;
     }
 
     @keyframes bounce {
@@ -56,7 +56,7 @@
 
     .input-group { margin-bottom: 15px; position: relative; text-align: left; }
     
-    input[type="text"], input[type="password"], input[type="email"], input[type="file"], input[type="url"] {
+    input[type="text"], input[type="password"], input[type="email"], input[type="url"] {
       width: 100%;
       padding: 12px;
       box-sizing: border-box;
@@ -64,6 +64,13 @@
       border: 1px solid #ccc;
       font-size: 16px; 
       outline: none;
+    }
+
+    /* File Input Styling */
+    input[type="file"] {
+        font-size: 14px;
+        margin-top: 5px;
+        width: 100%;
     }
 
     /* Settings Details */
@@ -80,6 +87,27 @@
         color: #0277bd;
         cursor: pointer;
         outline: none;
+        margin-bottom: 10px;
+    }
+    
+    .setting-block {
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .setting-label {
+        font-size: 12px;
+        font-weight: bold;
+        color: #666;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .or-divider {
+        font-size: 11px;
+        color: #999;
+        text-align: center;
+        margin: 5px 0;
+        display: block;
     }
 
     button.start-btn {
@@ -147,7 +175,7 @@
         align-items: center;
         justify-content: center;
         transition: all 0.2s;
-        text-decoration: none; /* For ref link */
+        text-decoration: none; 
     }
     #music-btn.playing {
         background: #00bcd4;
@@ -292,18 +320,33 @@
 
     <details>
         <summary>⚙️ Optional Settings</summary>
-        <div class="input-group" style="margin-top:10px;">
-            <input type="url" id="musicUrl" placeholder="🎵 Music URL (mp3 link)">
+        
+        <div class="setting-block">
+            <span class="setting-label">🎵 Background Music</span>
+            <input type="url" id="musicUrl" placeholder="Paste MP3 URL">
+            <span class="or-divider">- OR -</span>
+            <input type="file" id="musicFile" accept="audio/*">
         </div>
-        <div class="input-group">
-            <input type="url" id="logoUrl" placeholder="🖼️ Logo Image URL">
+
+        <div class="setting-block">
+            <span class="setting-label">🖼️ Custom Logo</span>
+            <input type="url" id="logoUrl" placeholder="Paste Image URL">
+            <span class="or-divider">- OR -</span>
+            <input type="file" id="logoFile" accept="image/*">
         </div>
-        <div class="input-group">
-            <input type="url" id="successImgUrl" placeholder="🏆 Success Image URL">
+
+        <div class="setting-block">
+            <span class="setting-label">🏆 Success Image</span>
+            <input type="url" id="successImgUrl" placeholder="Paste Image URL">
+            <span class="or-divider">- OR -</span>
+            <input type="file" id="successImgFile" accept="image/*">
         </div>
-        <div class="input-group">
-            <input type="url" id="refLink" placeholder="🔗 Reference Link (YouTube/Web)">
+
+        <div class="setting-block">
+            <span class="setting-label">🔗 Reference Link</span>
+            <input type="url" id="refLink" placeholder="Paste Website/YouTube Link">
         </div>
+
         <div class="input-group">
             <input type="email" id="ownerEmail" placeholder="Teacher Email">
         </div>
