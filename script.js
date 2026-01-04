@@ -15,10 +15,6 @@ const defaultSuccessImages = [
     "https://cdn-icons-png.flaticon.com/512/864/864837.png"
 ];
 
-// Default Music (Lofi) - Used if no custom URL is provided, but field left blank means no music by default unless default logic desired. 
-// We will use the user input. If user input is empty, we can use a default or nothing. 
-// Let's use a default placeholder if they want music but don't paste one, or just rely on input.
-// For now, if input is empty, no music changes (keeps silence or previous default).
 const DEFAULT_MUSIC_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3";
 
 // --- VARIABLES ---
@@ -31,9 +27,15 @@ let recognition = null;
 let musicPlayer = document.getElementById('bg-music');
 let isMusicOn = false;
 
-// Custom Settings
-let customSuccessUrl = "";
+// Custom Assets Storage (Base64 or URL)
+let activeLogoSrc = ""; 
+let activeSuccessSrc = "";
 let customRefLink = "";
+
+// Holders for file uploads (before start is clicked)
+let uploadedMusicData = null;
+let uploadedLogoData = null;
+let uploadedSuccessData = null;
 
 // Session Configuration
 let workQueue = [];
@@ -53,18 +55,35 @@ let currentLevelState = {
 };
 
 // ==========================================
-// 1. SETUP & MUSIC
+// 1. SETUP & FILE HANDLERS
 // ==========================================
 
 // Initial Render
 document.getElementById('app-logo-header').innerHTML = SMILE_LOGO_SVG;
+
+// --- Helper to read files ---
+function handleFileUpload(inputId, callback) {
+    document.getElementById(inputId).addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => callback(evt.target.result);
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Attach listeners for settings files
+handleFileUpload('musicFile', (data) => { uploadedMusicData = data; });
+handleFileUpload('logoFile', (data) => { uploadedLogoData = data; });
+handleFileUpload('successImgFile', (data) => { uploadedSuccessData = data; });
 
 // Music Control
 const musicBtn = document.getElementById('music-btn');
 musicPlayer.volume = 0.3; 
 
 function toggleMusic() {
-    if (!musicPlayer.src || musicPlayer.src === window.location.href) return; // No source
+    if (!musicPlayer.src || musicPlayer.src === window.location.href) return;
     
     if (musicPlayer.paused) {
         musicPlayer.play().catch(e => console.log("Audio play error:", e));
@@ -91,6 +110,7 @@ document.getElementById('close-app-btn').onclick = () => {
     musicBtn.classList.remove('playing');
 };
 
+// Data File Handler
 document.getElementById('fileInput').addEventListener('change', (event) => {
   const file = event.target.files[0];
   if (!file) return;
@@ -112,57 +132,68 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
   reader.readAsText(file);
 });
 
+// START BUTTON Logic
 document.getElementById('startBtn').addEventListener('click', () => {
     if (normalData.length === 0 && questionData.length === 0) {
         alert("Please upload a valid data file first.");
         return;
     }
     
-    // 1. Get Basic Info
+    // Basic Info
     currentUser = document.getElementById('username').value.trim() || "Student";
     ownerEmail = document.getElementById('ownerEmail').value.trim() || "";
     geminiKey = document.getElementById('apiKey').value.trim();
 
-    // 2. Get Custom Settings
-    const userMusicUrl = document.getElementById('musicUrl').value.trim();
-    const userLogoUrl = document.getElementById('logoUrl').value.trim();
-    const userSuccessUrl = document.getElementById('successImgUrl').value.trim();
-    const userRefLink = document.getElementById('refLink').value.trim();
+    // --- APPLY SETTINGS (File > URL > Default) ---
 
-    // Apply Settings
-    if (userMusicUrl) {
+    // 1. Music
+    const userMusicUrl = document.getElementById('musicUrl').value.trim();
+    if (uploadedMusicData) {
+        musicPlayer.src = uploadedMusicData;
+    } else if (userMusicUrl) {
         musicPlayer.src = userMusicUrl;
     } else {
-        musicPlayer.src = DEFAULT_MUSIC_URL; // Default if none provided
+        musicPlayer.src = DEFAULT_MUSIC_URL;
     }
 
-    if (userLogoUrl) {
-        // Change Logo (Keep animation class from container in HTML)
-        const logoHTML = `<img src="${userLogoUrl}" class="custom-logo" alt="Logo">`;
+    // 2. Logo
+    const userLogoUrl = document.getElementById('logoUrl').value.trim();
+    if (uploadedLogoData) {
+        activeLogoSrc = uploadedLogoData;
+    } else if (userLogoUrl) {
+        activeLogoSrc = userLogoUrl;
+    }
+
+    if (activeLogoSrc) {
+        const logoHTML = `<img src="${activeLogoSrc}" class="custom-logo" alt="Logo">`;
         document.getElementById('app-logo-header').innerHTML = logoHTML;
-        // Optionally update the setup screen logo too if they go back
         document.getElementById('setup-logo').innerHTML = logoHTML;
     }
 
-    if (userSuccessUrl) {
-        customSuccessUrl = userSuccessUrl;
+    // 3. Success Image
+    const userSuccessUrl = document.getElementById('successImgUrl').value.trim();
+    if (uploadedSuccessData) {
+        activeSuccessSrc = uploadedSuccessData;
+    } else if (userSuccessUrl) {
+        activeSuccessSrc = userSuccessUrl;
     }
 
-    // Handle Reference Link
+    // 4. Reference Link
+    const userRefLink = document.getElementById('refLink').value.trim();
     const refBtn = document.getElementById('ref-btn');
     if (userRefLink) {
         customRefLink = userRefLink;
         refBtn.href = customRefLink;
-        refBtn.style.display = 'flex'; // Show button
+        refBtn.style.display = 'flex'; 
     } else {
-        refBtn.style.display = 'none'; // Hide if no link
+        refBtn.style.display = 'none';
     }
 
     // Start App
     document.getElementById('setup-container').style.display = 'none';
     document.getElementById('ghost-overlay-root').style.display = 'block';
     
-    toggleMusic(); // Start music
+    toggleMusic(); 
 
     currentBatchIndex = 0;
     workQueue = [];
@@ -455,10 +486,10 @@ function showResultModal(currentRecord, isNewRecord) {
     let totalTime = 0; myHistory.forEach(h => totalTime += parseFloat(h.time));
     const recentHistory = myHistory.slice(0, 5); 
 
-    // DETERMINE IMAGE (Custom or Random)
+    // DETERMINE IMAGE
     let displayImg = "";
-    if (customSuccessUrl) {
-        displayImg = customSuccessUrl;
+    if (activeSuccessSrc) {
+        displayImg = activeSuccessSrc;
     } else {
         displayImg = defaultSuccessImages[Math.floor(Math.random() * defaultSuccessImages.length)];
     }
