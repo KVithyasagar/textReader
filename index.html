@@ -24,11 +24,28 @@
       border-radius: 20px;
       width: 90%;
       max-width: 400px;
+      max-height: 90vh; /* Allow scrolling on small screens */
+      overflow-y: auto;
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
       text-align: center;
     }
 
-    .logo-container { margin-bottom: 20px; animation: bounce 2s infinite; }
+    .logo-container { 
+        margin-bottom: 20px; 
+        animation: bounce 2s infinite; 
+        height: 70px; /* Fixed height to prevent jumps */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .custom-logo {
+        height: 70px;
+        width: 70px;
+        object-fit: contain;
+        border-radius: 50%; /* Optional: makes square images round */
+    }
+
     @keyframes bounce {
       0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
       40% {transform: translateY(-10px);}
@@ -39,7 +56,7 @@
 
     .input-group { margin-bottom: 15px; position: relative; text-align: left; }
     
-    input[type="text"], input[type="password"], input[type="email"], input[type="file"] {
+    input[type="text"], input[type="password"], input[type="email"], input[type="file"], input[type="url"] {
       width: 100%;
       padding: 12px;
       box-sizing: border-box;
@@ -47,6 +64,22 @@
       border: 1px solid #ccc;
       font-size: 16px; 
       outline: none;
+    }
+
+    /* Settings Details */
+    details {
+        text-align: left;
+        margin-bottom: 15px;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 10px;
+        background: #f9f9f9;
+    }
+    summary {
+        font-weight: bold;
+        color: #0277bd;
+        cursor: pointer;
+        outline: none;
     }
 
     button.start-btn {
@@ -95,7 +128,13 @@
         padding: 10px 20px;
     }
 
-    #music-btn {
+    .header-right {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    #music-btn, #ref-btn {
         background: #fff;
         border: 2px solid #00bcd4;
         color: #00bcd4;
@@ -108,12 +147,18 @@
         align-items: center;
         justify-content: center;
         transition: all 0.2s;
+        text-decoration: none; /* For ref link */
     }
     #music-btn.playing {
         background: #00bcd4;
         color: white;
         animation: pulse 1.5s infinite;
     }
+    #ref-btn {
+        border-color: #ff9800;
+        color: #ff9800;
+    }
+    
     @keyframes pulse {
         0% { box-shadow: 0 0 0 0 rgba(0, 188, 212, 0.4); }
         70% { box-shadow: 0 0 0 10px rgba(0, 188, 212, 0); }
@@ -218,11 +263,11 @@
 <body>
 
   <audio id="bg-music" loop>
-    <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" type="audio/mpeg">
+    <source src="" type="audio/mpeg">
   </audio>
 
   <div id="setup-container">
-    <div class="logo-container">
+    <div class="logo-container" id="setup-logo">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="70" height="70">
         <circle cx="50" cy="50" r="45" fill="#FFEB3B" stroke="#FBC02D" stroke-width="2"/>
         <circle cx="35" cy="40" r="5" fill="#333"/>
@@ -244,9 +289,25 @@
     <div class="input-group">
       <input type="text" id="username" placeholder="Student Name">
     </div>
-    <div class="input-group">
-      <input type="email" id="ownerEmail" placeholder="Teacher Email (Optional)">
-    </div>
+
+    <details>
+        <summary>⚙️ Optional Settings</summary>
+        <div class="input-group" style="margin-top:10px;">
+            <input type="url" id="musicUrl" placeholder="🎵 Music URL (mp3 link)">
+        </div>
+        <div class="input-group">
+            <input type="url" id="logoUrl" placeholder="🖼️ Logo Image URL">
+        </div>
+        <div class="input-group">
+            <input type="url" id="successImgUrl" placeholder="🏆 Success Image URL">
+        </div>
+        <div class="input-group">
+            <input type="url" id="refLink" placeholder="🔗 Reference Link (YouTube/Web)">
+        </div>
+        <div class="input-group">
+            <input type="email" id="ownerEmail" placeholder="Teacher Email">
+        </div>
+    </details>
 
     <button id="startBtn" class="start-btn">START SESSION 🚀</button>
   </div>
@@ -254,7 +315,8 @@
   <div id="ghost-overlay-root">
     <div class="app-header">
         <div style="display:inline-block;" id="app-logo-header"></div>
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div class="header-right">
+            <a id="ref-btn" href="#" target="_blank" style="display:none;" title="Open Reference">🔗</a>
             <button id="music-btn" title="Play/Pause Music">🎵</button>
             <button id="close-app-btn" style="background:none; border:none; font-size:24px; color:#00acc1;">×</button>
         </div>
