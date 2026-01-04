@@ -1,4 +1,4 @@
-// --- ASSETS: STATIC SMILING FACE LOGO ---
+// --- DEFAULT ASSETS ---
 const SMILE_LOGO_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="50" height="50">
   <circle cx="50" cy="50" r="45" fill="#FFEB3B" stroke="#FBC02D" stroke-width="2"/>
@@ -7,13 +7,19 @@ const SMILE_LOGO_SVG = `
   <path d="M 30 65 Q 50 80 70 65" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round"/>
 </svg>`;
 
-// --- SUCCESS IMAGES (You can add your own URLs here) ---
-const successImages = [
-    "https://cdn-icons-png.flaticon.com/512/616/616490.png", // Trophy
-    "https://cdn-icons-png.flaticon.com/512/744/744922.png", // Star
-    "https://cdn-icons-png.flaticon.com/512/2278/2278992.png", // Happy
-    "https://cdn-icons-png.flaticon.com/512/864/864837.png"  // Medal
+// Default Random Success Images
+const defaultSuccessImages = [
+    "https://cdn-icons-png.flaticon.com/512/616/616490.png",
+    "https://cdn-icons-png.flaticon.com/512/744/744922.png",
+    "https://cdn-icons-png.flaticon.com/512/2278/2278992.png",
+    "https://cdn-icons-png.flaticon.com/512/864/864837.png"
 ];
+
+// Default Music (Lofi) - Used if no custom URL is provided, but field left blank means no music by default unless default logic desired. 
+// We will use the user input. If user input is empty, we can use a default or nothing. 
+// Let's use a default placeholder if they want music but don't paste one, or just rely on input.
+// For now, if input is empty, no music changes (keeps silence or previous default).
+const DEFAULT_MUSIC_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3";
 
 // --- VARIABLES ---
 let normalData = [];
@@ -24,6 +30,10 @@ let geminiKey = "";
 let recognition = null;
 let musicPlayer = document.getElementById('bg-music');
 let isMusicOn = false;
+
+// Custom Settings
+let customSuccessUrl = "";
+let customRefLink = "";
 
 // Session Configuration
 let workQueue = [];
@@ -46,15 +56,18 @@ let currentLevelState = {
 // 1. SETUP & MUSIC
 // ==========================================
 
+// Initial Render
 document.getElementById('app-logo-header').innerHTML = SMILE_LOGO_SVG;
 
-// Music Control Logic
+// Music Control
 const musicBtn = document.getElementById('music-btn');
-musicPlayer.volume = 0.3; // Low background volume
+musicPlayer.volume = 0.3; 
 
 function toggleMusic() {
+    if (!musicPlayer.src || musicPlayer.src === window.location.href) return; // No source
+    
     if (musicPlayer.paused) {
-        musicPlayer.play();
+        musicPlayer.play().catch(e => console.log("Audio play error:", e));
         isMusicOn = true;
         musicBtn.classList.add('playing');
         musicBtn.innerHTML = "⏸";
@@ -66,19 +79,8 @@ function toggleMusic() {
     }
 }
 
-// Pause music temporarily (for speech/TTS)
-function pauseMusicTemp() {
-    if (isMusicOn && !musicPlayer.paused) {
-        musicPlayer.pause();
-    }
-}
-
-// Resume music if it was globally on
-function resumeMusicTemp() {
-    if (isMusicOn && musicPlayer.paused) {
-        musicPlayer.play();
-    }
-}
+function pauseMusicTemp() { if (isMusicOn && !musicPlayer.paused) musicPlayer.pause(); }
+function resumeMusicTemp() { if (isMusicOn && musicPlayer.paused) musicPlayer.play(); }
 
 musicBtn.onclick = toggleMusic;
 
@@ -115,15 +117,52 @@ document.getElementById('startBtn').addEventListener('click', () => {
         alert("Please upload a valid data file first.");
         return;
     }
+    
+    // 1. Get Basic Info
     currentUser = document.getElementById('username').value.trim() || "Student";
     ownerEmail = document.getElementById('ownerEmail').value.trim() || "";
     geminiKey = document.getElementById('apiKey').value.trim();
 
+    // 2. Get Custom Settings
+    const userMusicUrl = document.getElementById('musicUrl').value.trim();
+    const userLogoUrl = document.getElementById('logoUrl').value.trim();
+    const userSuccessUrl = document.getElementById('successImgUrl').value.trim();
+    const userRefLink = document.getElementById('refLink').value.trim();
+
+    // Apply Settings
+    if (userMusicUrl) {
+        musicPlayer.src = userMusicUrl;
+    } else {
+        musicPlayer.src = DEFAULT_MUSIC_URL; // Default if none provided
+    }
+
+    if (userLogoUrl) {
+        // Change Logo (Keep animation class from container in HTML)
+        const logoHTML = `<img src="${userLogoUrl}" class="custom-logo" alt="Logo">`;
+        document.getElementById('app-logo-header').innerHTML = logoHTML;
+        // Optionally update the setup screen logo too if they go back
+        document.getElementById('setup-logo').innerHTML = logoHTML;
+    }
+
+    if (userSuccessUrl) {
+        customSuccessUrl = userSuccessUrl;
+    }
+
+    // Handle Reference Link
+    const refBtn = document.getElementById('ref-btn');
+    if (userRefLink) {
+        customRefLink = userRefLink;
+        refBtn.href = customRefLink;
+        refBtn.style.display = 'flex'; // Show button
+    } else {
+        refBtn.style.display = 'none'; // Hide if no link
+    }
+
+    // Start App
     document.getElementById('setup-container').style.display = 'none';
     document.getElementById('ghost-overlay-root').style.display = 'block';
     
-    // Auto-start music
-    toggleMusic();
+    toggleMusic(); // Start music
 
     currentBatchIndex = 0;
     workQueue = [];
@@ -260,7 +299,7 @@ function startLevel() {
   const addMoreBtn = createButton("➕ Add", "btn-add");
 
   addMoreBtn.onclick = () => {
-    pauseMusicTemp(); // Pause for interaction
+    pauseMusicTemp(); 
     const numToAdd = parseInt(addInput.value) || 5;
     const currentCount = currentLevelState.data.length;
     const nextStart = actualStartIndex + currentCount;
@@ -404,7 +443,7 @@ function checkBatchMatch(userText, batchData, combinedKeywords, method) {
   }
 }
 
-// --- MODIFIED SUCCESS SCREEN (RANDOM IMAGE) ---
+// --- SUCCESS SCREEN ---
 function showResultModal(currentRecord, isNewRecord) {
     const container = document.getElementById('ghost-content-area');
     container.innerHTML = ""; 
@@ -416,8 +455,13 @@ function showResultModal(currentRecord, isNewRecord) {
     let totalTime = 0; myHistory.forEach(h => totalTime += parseFloat(h.time));
     const recentHistory = myHistory.slice(0, 5); 
 
-    // PICK RANDOM IMAGE
-    const randomImgUrl = successImages[Math.floor(Math.random() * successImages.length)];
+    // DETERMINE IMAGE (Custom or Random)
+    let displayImg = "";
+    if (customSuccessUrl) {
+        displayImg = customSuccessUrl;
+    } else {
+        displayImg = defaultSuccessImages[Math.floor(Math.random() * defaultSuccessImages.length)];
+    }
 
     let tableHtml = `
       <table id="ghost-history-table" style="width:100%; border-collapse:collapse; margin-top:15px; font-size:12px; text-align:left; color:#006064;">
@@ -430,7 +474,7 @@ function showResultModal(currentRecord, isNewRecord) {
 
     modal.innerHTML = `
         <h3 style="color:#0277bd; margin:5px 0 5px 0;">Great Job!</h3>
-        <img src="${randomImgUrl}" class="success-img" alt="Success">
+        <img src="${displayImg}" class="success-img" alt="Success">
 
         <div style="background:rgba(255,255,255,0.6); padding:10px; border-radius:10px; border:1px solid #b2ebf2; margin-bottom:15px;">
             <div style="font-size:14px; color:#006064; display:flex; justify-content:space-around; margin-bottom:8px;">
