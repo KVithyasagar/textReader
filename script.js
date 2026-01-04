@@ -7,6 +7,14 @@ const SMILE_LOGO_SVG = `
   <path d="M 30 65 Q 50 80 70 65" stroke="#333" stroke-width="4" fill="none" stroke-linecap="round"/>
 </svg>`;
 
+// --- SUCCESS IMAGES (You can add your own URLs here) ---
+const successImages = [
+    "https://cdn-icons-png.flaticon.com/512/616/616490.png", // Trophy
+    "https://cdn-icons-png.flaticon.com/512/744/744922.png", // Star
+    "https://cdn-icons-png.flaticon.com/512/2278/2278992.png", // Happy
+    "https://cdn-icons-png.flaticon.com/512/864/864837.png"  // Medal
+];
+
 // --- VARIABLES ---
 let normalData = [];
 let questionData = [];
@@ -14,6 +22,8 @@ let currentUser = "Student";
 let ownerEmail = "";
 let geminiKey = "";
 let recognition = null;
+let musicPlayer = document.getElementById('bg-music');
+let isMusicOn = false;
 
 // Session Configuration
 let workQueue = [];
@@ -33,23 +43,55 @@ let currentLevelState = {
 };
 
 // ==========================================
-// 1. SETUP & FILE LOADING
+// 1. SETUP & MUSIC
 // ==========================================
 
-// Initialize Header Logo
 document.getElementById('app-logo-header').innerHTML = SMILE_LOGO_SVG;
 
-// Close Button Logic
+// Music Control Logic
+const musicBtn = document.getElementById('music-btn');
+musicPlayer.volume = 0.3; // Low background volume
+
+function toggleMusic() {
+    if (musicPlayer.paused) {
+        musicPlayer.play();
+        isMusicOn = true;
+        musicBtn.classList.add('playing');
+        musicBtn.innerHTML = "⏸";
+    } else {
+        musicPlayer.pause();
+        isMusicOn = false;
+        musicBtn.classList.remove('playing');
+        musicBtn.innerHTML = "🎵";
+    }
+}
+
+// Pause music temporarily (for speech/TTS)
+function pauseMusicTemp() {
+    if (isMusicOn && !musicPlayer.paused) {
+        musicPlayer.pause();
+    }
+}
+
+// Resume music if it was globally on
+function resumeMusicTemp() {
+    if (isMusicOn && musicPlayer.paused) {
+        musicPlayer.play();
+    }
+}
+
+musicBtn.onclick = toggleMusic;
+
 document.getElementById('close-app-btn').onclick = () => {
     document.getElementById('ghost-overlay-root').style.display = 'none';
     document.getElementById('setup-container').style.display = 'block';
+    musicPlayer.pause();
+    musicBtn.classList.remove('playing');
 };
 
-// File Input Listener
 document.getElementById('fileInput').addEventListener('change', (event) => {
   const file = event.target.files[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = (e) => {
     const text = e.target.result;
@@ -61,40 +103,32 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
         parsedData.push({ text: parts[0].trim(), keyword: parts[1].trim() });
       }
     });
-    
-    // Store in RAM for this session
     normalData = parsedData.filter(item => !item.text.startsWith("Q:"));
     questionData = parsedData.filter(item => item.text.startsWith("Q:"));
-    
     document.getElementById('status').innerText = `✅ Loaded ${parsedData.length} lines`;
   };
   reader.readAsText(file);
 });
 
-// Start Button Logic
 document.getElementById('startBtn').addEventListener('click', () => {
     if (normalData.length === 0 && questionData.length === 0) {
         alert("Please upload a valid data file first.");
         return;
     }
-    
     currentUser = document.getElementById('username').value.trim() || "Student";
     ownerEmail = document.getElementById('ownerEmail').value.trim() || "";
     geminiKey = document.getElementById('apiKey').value.trim();
 
-    if (!geminiKey) {
-        // alert("Warning: No API Key provided. Exam scanning will not work.");
-    }
-
-    // Switch Screens
     document.getElementById('setup-container').style.display = 'none';
     document.getElementById('ghost-overlay-root').style.display = 'block';
     
+    // Auto-start music
+    toggleMusic();
+
     currentBatchIndex = 0;
     workQueue = [];
     renderSelectionPage();
 });
-
 
 // ==========================================
 // 2. SELECTION PAGE
@@ -102,11 +136,9 @@ document.getElementById('startBtn').addEventListener('click', () => {
 function renderSelectionPage() {
   const container = document.getElementById('ghost-content-area');
   container.innerHTML = `<h2 style="color:#01579b; margin-top:0;">Select Sentences</h2>`;
-
   const wrapper = document.createElement('div');
   wrapper.style.textAlign = "left";
 
-  // Controls
   const controlRow = document.createElement('div');
   Object.assign(controlRow.style, { display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center', background: '#f5f5f5', padding: '10px', borderRadius: '8px' });
 
@@ -128,28 +160,19 @@ function renderSelectionPage() {
 
   controlRow.append(toggleAllBtn, batchLabel, batchInput);
 
-  // List
   const listContainer = document.createElement('div');
   Object.assign(listContainer.style, { maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '6px' });
 
   const checkboxes = [];
-
   normalData.forEach((item, idx) => {
     const pastAttempts = historyLog.filter(h => h.sentence === item.text).length;
     const row = document.createElement('div');
     row.style.marginBottom = "8px";
-    
     const chk = document.createElement('input');
-    chk.type = "checkbox";
-    chk.value = idx;
-    chk.id = `ghost-chk-${idx}`;
-    chk.style.marginRight = "10px";
-    chk.style.width = "auto"; // Override global width
-    
+    chk.type = "checkbox"; chk.value = idx; chk.id = `ghost-chk-${idx}`; chk.style.marginRight = "10px"; chk.style.width = "auto";
     const lbl = document.createElement('label');
     lbl.htmlFor = `ghost-chk-${idx}`;
     lbl.innerHTML = `<b>#${idx + 1}</b>: ${item.text.substring(0, 40)}... <span style="font-size:11px; color:#666;">(${pastAttempts})</span>`;
-    
     row.append(chk, lbl);
     listContainer.appendChild(row);
     checkboxes.push(chk);
@@ -163,16 +186,11 @@ function renderSelectionPage() {
 
   const startBtn = document.createElement('button');
   startBtn.innerText = "START SESSION";
-  startBtn.className = "start-btn"; // Use CSS class
-
+  startBtn.className = "start-btn"; 
   startBtn.onclick = () => {
     workQueue = [];
-    checkboxes.forEach((c) => {
-        if (c.checked) workQueue.push(normalData[parseInt(c.value)]);
-    });
-
+    checkboxes.forEach((c) => { if (c.checked) workQueue.push(normalData[parseInt(c.value)]); });
     if (workQueue.length === 0) return alert("Please select at least one sentence.");
-    
     batchSize = parseInt(batchInput.value) || 1;
     currentBatchIndex = 0; 
     startLevel();
@@ -185,11 +203,9 @@ function renderSelectionPage() {
 // ==========================================
 // 3. MAIN TRAINING LOGIC
 // ==========================================
-
 function startLevel() {
   const container = document.getElementById('ghost-content-area');
   container.innerHTML = ""; 
-  
   levelStartTime = Date.now();
   const actualStartIndex = currentBatchIndex * batchSize;
 
@@ -198,14 +214,12 @@ function startLevel() {
     return;
   }
 
-  // --- INITIAL BATCH ---
   currentLevelState.data = workQueue.slice(actualStartIndex, actualStartIndex + batchSize);
   updateLevelState(); 
 
   const attemptCount = historyLog.filter(h => h.sentence === currentLevelState.combinedText).length + 1;
   speakText(currentLevelState.combinedText);
 
-  // --- UI ---
   const startNum = actualStartIndex + 1;
   const endNum = actualStartIndex + currentLevelState.data.length;
   
@@ -218,30 +232,20 @@ function startLevel() {
     <span>Attempt #${attemptCount}</span>
   `;
 
-  // Text Display (Sentence)
   const textDiv = document.createElement('div');
   textDiv.id = "ghost-text";
   textDiv.innerHTML = formatTextHighlights(currentLevelState.combinedText, ""); 
-  // Initial State: Visible
   textDiv.style.opacity = "1";
+  textDiv.onclick = () => { textDiv.style.opacity = "1"; document.getElementById('ghost-user-input').focus(); pauseMusicTemp(); };
 
-  // MODIFICATION: Click to Reveal + Focus input
-  textDiv.onclick = () => { 
-      textDiv.style.opacity = "1";
-      document.getElementById('ghost-user-input').focus();
-  };
-
-  // Input Field
   const input = document.createElement('input');
   input.type = "text";
   input.id = "ghost-user-input"; 
   input.placeholder = "Type here... (text hides when typing)";
   
-  // Feedback Div
   const feedbackDiv = document.createElement('div');
   feedbackDiv.id = "ghost-input-feedback";
 
-  // Buttons Row
   const btnRow = document.createElement('div');
   btnRow.className = "ghost-btn-row";
   
@@ -249,57 +253,37 @@ function startLevel() {
   const peekBtn = createButton("👁️ Peek", "btn-peek"); 
   const knowBtn = createButton("🧠 I Know", "btn-know"); 
   
-  // --- ADD BUTTON GROUP ---
   const addGroup = document.createElement('div');
   addGroup.className = "add-group";
-
-  // Colorful Number Box
   const addInput = document.createElement('input');
-  addInput.type = "number";
-  addInput.value = "5";
-  addInput.className = "add-input";
-  
-  // Yellow Add Button
+  addInput.type = "number"; addInput.value = "5"; addInput.className = "add-input";
   const addMoreBtn = createButton("➕ Add", "btn-add");
 
   addMoreBtn.onclick = () => {
+    pauseMusicTemp(); // Pause for interaction
     const numToAdd = parseInt(addInput.value) || 5;
     const currentCount = currentLevelState.data.length;
     const nextStart = actualStartIndex + currentCount;
     const moreItems = workQueue.slice(nextStart, nextStart + numToAdd);
-    
     if (moreItems.length === 0) return alert("End of list reached.");
-
     currentLevelState.data = [...currentLevelState.data, ...moreItems];
     updateLevelState();
-
-    // Refresh Display
     const txtDiv = document.getElementById('ghost-text');
     txtDiv.innerHTML = formatTextHighlights(currentLevelState.combinedText, input.value); 
-    txtDiv.style.opacity = "1"; // Show when adding
-    
+    txtDiv.style.opacity = "1"; 
     const newEndNum = actualStartIndex + currentLevelState.data.length;
     document.getElementById('ghost-stats-bar').children[0].innerText = `Items: ${startNum} - ${newEndNum}`;
-    
     updateLiveKeywordStats(input.value);
     speakText(moreItems.map(d=>d.text).join(' '));
   };
 
   addGroup.append(addInput, addMoreBtn);
-
   const endBtn = createButton("⏹️ End", "btn-end");
-  
   btnRow.append(micBtn, peekBtn, knowBtn, addGroup, endBtn);
 
-  // --- LISTENERS ---
   input.addEventListener('input', () => { 
-      // MODIFICATION: Hide on type
       textDiv.style.opacity = "0"; 
-      
-      // Update highlights (background)
       textDiv.innerHTML = formatTextHighlights(currentLevelState.combinedText, input.value);
-      
-      // Update stats/symbols
       updateLiveKeywordStats(input.value); 
   });
   
@@ -309,11 +293,7 @@ function startLevel() {
 
   micBtn.onclick = () => { toggleVoice(input, currentLevelState.combinedKeywords, currentLevelState.data); };
   
-  // Peek Button Logic
-  peekBtn.onclick = () => { 
-      textDiv.style.opacity = "1"; 
-      input.focus(); 
-  };
+  peekBtn.onclick = () => { textDiv.style.opacity = "1"; input.focus(); pauseMusicTemp(); };
   
   knowBtn.onclick = () => { 
       textDiv.innerHTML = formatTextHighlights(currentLevelState.combinedText, currentLevelState.combinedText); 
@@ -326,30 +306,23 @@ function startLevel() {
   setTimeout(() => input.focus(), 50); 
 }
 
-// --- HELPER: TEXT HIGHLIGHTING ---
 function formatTextHighlights(targetText, userText) {
     const tokens = targetText.split(/([^a-zA-Z0-9]+)/);
     const userWords = userText.toLowerCase().split(/[^a-zA-Z0-9]+/).filter(w => w.length > 0);
-
     return tokens.map(token => {
         if (/[a-zA-Z0-9]/.test(token)) {
             const cleanToken = token.toLowerCase();
-            if (userWords.includes(cleanToken)) {
-                return `<span style="color:#43a047; font-weight:bold;">${token}</span>`; 
-            }
+            if (userWords.includes(cleanToken)) return `<span style="color:#43a047; font-weight:bold;">${token}</span>`; 
             return `<span style="color:#0277bd;">${token}</span>`; 
         }
         return token;
     }).join('');
 }
 
-// --- HELPER: KEYWORD PARSING ---
 function parseKeywords(keywordString) {
     const raw = keywordString.toLowerCase();
     if (raw.includes(',')) {
-        return raw.split(',').map(chunk => 
-            chunk.trim().split('/').map(v => v.trim()).filter(v => v.length > 0)
-        ).filter(group => group.length > 0);
+        return raw.split(',').map(chunk => chunk.trim().split('/').map(v => v.trim()).filter(v => v.length > 0)).filter(group => group.length > 0);
     }
     const tokens = raw.split(/\s+/).filter(w => w.length > 0);
     return tokens.map(token => token.split(/[\/]/).filter(t => t.length > 0));
@@ -359,14 +332,10 @@ function getKeywordCount(kString) {
     return parseKeywords(kString).length;
 }
 
-// --- STATS UPDATE ---
 function updateLiveKeywordStats(userText) {
     const requiredGroups = parseKeywords(currentLevelState.combinedKeywords);
-    const userWords = userText.toLowerCase(); 
-    
     let matches = 0;
     let foundWords = [];
-
     requiredGroups.forEach(group => {
         const matchedVariants = group.filter(variant => userText.toLowerCase().includes(variant));
         if (matchedVariants.length > 0) {
@@ -374,16 +343,8 @@ function updateLiveKeywordStats(userText) {
             matchedVariants.forEach(m => foundWords.push(`${m} ✅`));
         }
     });
-    
-    const statsEl = document.getElementById('ghost-keyword-stats');
-    if(statsEl) {
-        statsEl.innerHTML = `Keywords: <b>${matches}</b> / ${requiredGroups.length}`;
-    }
-
-    const feedbackEl = document.getElementById('ghost-input-feedback');
-    if(feedbackEl) {
-        feedbackEl.innerHTML = foundWords.length > 0 ? foundWords.join('&nbsp;&nbsp; ') : '';
-    }
+    document.getElementById('ghost-keyword-stats').innerHTML = `Keywords: <b>${matches}</b> / ${requiredGroups.length}`;
+    document.getElementById('ghost-input-feedback').innerHTML = foundWords.length > 0 ? foundWords.join('&nbsp;&nbsp; ') : '';
 }
 
 function updateLevelState() {
@@ -403,33 +364,22 @@ function checkBatchMatch(userText, batchData, combinedKeywords, method) {
       const userLower = userText.trim().toLowerCase();
       matchesCount = 0;
       requiredGroups.forEach(group => {
-         if (group.some(variant => userLower.includes(variant))) {
-             matchesCount++; 
-         }
+         if (group.some(variant => userLower.includes(variant))) matchesCount++; 
       });
       if ((matchesCount / requiredGroups.length) * 100 >= 80) passed = true;
   }
   
   if (passed) {
     const input = document.getElementById('ghost-user-input');
-    if(input) {
-        input.style.border = "2px solid #66bb6a"; 
-        input.value = "Correct!"; 
-        input.disabled = true;
-    }
+    if(input) { input.style.border = "2px solid #66bb6a"; input.value = "Correct!"; input.disabled = true; }
 
     const now = Date.now();
     const duration = (now - levelStartTime) / 1000; 
-    
     const batchKey = batchData.map(d => d.text).join(' ');
-    
     let historicalBest = bestTimes[batchKey] || Infinity;
     let isNewRecord = false;
     if (duration < historicalBest) {
-        historicalBest = duration; 
-        bestTimes[batchKey] = duration; 
-        isNewRecord = true;
-        // Storage Save
+        historicalBest = duration; bestTimes[batchKey] = duration; isNewRecord = true;
         localStorage.setItem('ghostBestTimes', JSON.stringify(bestTimes));
     }
 
@@ -446,9 +396,7 @@ function checkBatchMatch(userText, batchData, combinedKeywords, method) {
     
     historyLog.push(record);
     localStorage.setItem('ghostHistory', JSON.stringify(historyLog));
-
     setTimeout(() => { showResultModal(record, isNewRecord); }, 400); 
-
   } else {
     const input = document.getElementById('ghost-user-input');
     input.style.border = "2px solid #ef5350"; 
@@ -456,7 +404,7 @@ function checkBatchMatch(userText, batchData, combinedKeywords, method) {
   }
 }
 
-// --- RESULT MODAL ---
+// --- MODIFIED SUCCESS SCREEN (RANDOM IMAGE) ---
 function showResultModal(currentRecord, isNewRecord) {
     const container = document.getElementById('ghost-content-area');
     container.innerHTML = ""; 
@@ -465,16 +413,15 @@ function showResultModal(currentRecord, isNewRecord) {
     modal.style.textAlign = "center";
     
     const myHistory = historyLog.filter(h => h.sentence === currentRecord.sentence).reverse();
-    let totalTime = 0;
-    myHistory.forEach(h => totalTime += parseFloat(h.time));
+    let totalTime = 0; myHistory.forEach(h => totalTime += parseFloat(h.time));
     const recentHistory = myHistory.slice(0, 5); 
+
+    // PICK RANDOM IMAGE
+    const randomImgUrl = successImages[Math.floor(Math.random() * successImages.length)];
 
     let tableHtml = `
       <table id="ghost-history-table" style="width:100%; border-collapse:collapse; margin-top:15px; font-size:12px; text-align:left; color:#006064;">
-        <tr style="border-bottom:1px solid #b2ebf2;">
-            <th style="padding:5px; font-weight:normal;">Date</th>
-            <th style="padding:5px; font-weight:normal;">Time</th>
-        </tr>
+        <tr style="border-bottom:1px solid #b2ebf2;"><th style="padding:5px;">Date</th><th style="padding:5px;">Time</th></tr>
     `;
     recentHistory.forEach(h => {
         tableHtml += `<tr style="border-bottom:1px solid #e0f7fa;"><td style="padding:5px;">${h.date.split(',')[0]}</td><td style="padding:5px;">${h.time}s</td></tr>`;
@@ -482,7 +429,8 @@ function showResultModal(currentRecord, isNewRecord) {
     tableHtml += "</table>";
 
     modal.innerHTML = `
-        <h3 style="color:#0277bd; margin:5px 0 15px 0;">Great Job!</h3>
+        <h3 style="color:#0277bd; margin:5px 0 5px 0;">Great Job!</h3>
+        <img src="${randomImgUrl}" class="success-img" alt="Success">
 
         <div style="background:rgba(255,255,255,0.6); padding:10px; border-radius:10px; border:1px solid #b2ebf2; margin-bottom:15px;">
             <div style="font-size:14px; color:#006064; display:flex; justify-content:space-around; margin-bottom:8px;">
@@ -497,39 +445,28 @@ function showResultModal(currentRecord, isNewRecord) {
                 <div>📊 Total: <b>${totalTime.toFixed(2)}s</b></div>
             </div>
         </div>
-
-        <div style="text-align:left;">
-            ${tableHtml}
-        </div>
+        <div style="text-align:left;">${tableHtml}</div>
     `;
 
     const btnRow = document.createElement('div');
     btnRow.className = "ghost-btn-row";
     btnRow.style.justifyContent = "center";
 
-    const nextBtn = createButton("Continue ➡️", "start-btn"); // Reuse blue style
+    const nextBtn = createButton("Continue ➡️", "start-btn"); 
     nextBtn.style.margin = "0"; 
-    nextBtn.onclick = () => { 
-        currentBatchIndex++; 
-        startLevel(); 
-    };
+    nextBtn.onclick = () => { currentBatchIndex++; startLevel(); resumeMusicTemp(); };
 
     const saveBtn = createButton("End Session", "btn-end");
     saveBtn.onclick = () => showFinishScreen();
 
-    // MODIFICATION: Reset History Button
-    const resetBtn = createButton("Reset History 🔄", "btn-peek"); // Yellow style
+    const resetBtn = createButton("Reset History 🔄", "btn-peek");
     resetBtn.onclick = () => {
-        if (confirm("Are you sure you want to reset all history and start fresh?")) {
-            historyLog = [];
-            bestTimes = {};
+        if (confirm("Reset all history?")) {
+            historyLog = []; bestTimes = {};
             localStorage.setItem('ghostHistory', JSON.stringify([]));
             localStorage.setItem('ghostBestTimes', JSON.stringify({}));
-            
-            document.getElementById('ghost-history-table').innerHTML = '<tr style="border-bottom:1px solid #b2ebf2;"><th style="padding:5px;">Date</th><th style="padding:5px;">Time</th></tr><tr><td colspan="2" style="text-align:center; padding:10px;">History Cleared</td></tr>';
+            document.getElementById('ghost-history-table').innerHTML = '<tr><td colspan="2" style="text-align:center; padding:10px;">History Cleared</td></tr>';
             document.getElementById('ghost-best-display').innerHTML = '🏆 Best: <b>-</b>';
-            
-            alert("History reset successfully.");
         }
     };
 
@@ -538,133 +475,60 @@ function showResultModal(currentRecord, isNewRecord) {
     container.appendChild(modal);
 }
 
-// ==========================================
-// 4. FINISH & EXAM
-// ==========================================
 function showFinishScreen() {
     const container = document.getElementById('ghost-content-area');
     container.innerHTML = "";
-    
-    const title = document.createElement('h2'); 
-    title.innerHTML = `Session Complete`; 
-    title.style.color = "#01579b";
-    title.style.marginTop = "0";
-
-    const downloadBtn = createButton("Download History (.csv)", "btn-know"); 
-    downloadBtn.style.width = "100%";
-    downloadBtn.onclick = downloadCSV;
-
-    const examBtn = createButton("Start AI Exam", "btn-peek"); 
-    examBtn.style.width = "100%";
-    examBtn.onclick = renderAIExam;
-
+    const title = document.createElement('h2'); title.innerHTML = `Session Complete`; title.style.color = "#01579b"; title.style.marginTop = "0";
+    const downloadBtn = createButton("Download History (.csv)", "btn-know"); downloadBtn.style.width = "100%"; downloadBtn.onclick = downloadCSV;
+    const examBtn = createButton("Start AI Exam", "btn-peek"); examBtn.style.width = "100%"; examBtn.onclick = renderAIExam;
     container.append(title, downloadBtn, document.createElement('br'), document.createElement('br'), examBtn);
 }
 
 function downloadCSV() {
     let csvContent = "data:text/csv;charset=utf-8,Student,Date,Sentence,Method,Time(s),Best(s),Deviation(s)\n";
-    historyLog.forEach((row) => {
-        csvContent += `${currentUser},${row.date},"${row.sentence.replace(/"/g, '""')}",${row.method},${row.time},${row.best},${row.deviation}\n`;
-    });
+    historyLog.forEach((row) => { csvContent += `${currentUser},${row.date},"${row.sentence.replace(/"/g, '""')}",${row.method},${row.time},${row.best},${row.deviation}\n`; });
     const link = document.createElement("a"); link.href = encodeURI(csvContent); link.download = `${currentUser}_History.csv`; document.body.appendChild(link); link.click(); link.remove();
 }
 
 function renderAIExam() {
-  const container = document.getElementById('ghost-content-area'); 
-  container.innerHTML = `<h2 style="color:#01579b; margin-top:0;">AI Exam</h2>`;
-  
-  const qList = document.createElement('div'); 
-  qList.style.textAlign = "left"; 
-  qList.style.marginBottom = "20px";
-  qList.style.background = "rgba(255,255,255,0.7)"; 
-  qList.style.padding = "10px";
-  qList.style.borderRadius = "8px";
-  
-  questionData.forEach((item, index) => { 
-      qList.innerHTML += `<div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #b2ebf2;">
-        <b style="color:#0288d1">Q${index+1}:</b> <span style="font-size:16px;">${item.text.replace(/^Q:\s*/, "")}</span>
-      </div>`; 
-  });
+  const container = document.getElementById('ghost-content-area'); container.innerHTML = `<h2 style="color:#01579b; margin-top:0;">AI Exam</h2>`;
+  const qList = document.createElement('div'); qList.style.textAlign = "left"; qList.style.marginBottom = "20px"; qList.style.background = "rgba(255,255,255,0.7)"; qList.style.padding = "10px"; qList.style.borderRadius = "8px";
+  questionData.forEach((item, index) => { qList.innerHTML += `<div style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #b2ebf2;"><b style="color:#0288d1">Q${index+1}:</b> <span style="font-size:16px;">${item.text.replace(/^Q:\s*/, "")}</span></div>`; });
   container.appendChild(qList);
 
-  // Instructions
-  const instruction = document.createElement('div');
-  instruction.style.marginBottom = "10px";
-  instruction.style.fontSize = "13px";
-  instruction.style.color = "#555";
-  instruction.innerHTML = "<b>Option A:</b> Type answers below (Format: <i>1. Answer... 2. Answer...</i>)<br><b>Option B:</b> Upload an image to scan";
+  const instruction = document.createElement('div'); instruction.style.marginBottom = "10px"; instruction.style.fontSize = "13px"; instruction.style.color = "#555"; instruction.innerHTML = "<b>Option A:</b> Type answers below (Format: <i>1. Answer...</i>)<br><b>Option B:</b> Upload an image to scan";
   container.appendChild(instruction);
 
   const fileInput = document.createElement('input'); fileInput.type = "file"; fileInput.accept = "image/*"; fileInput.style.display = "block"; fileInput.style.marginBottom = "10px";
   const scanBtn = createButton("UPLOAD & SCAN", "start-btn"); scanBtn.style.width = "100%";
-  
-  const textArea = document.createElement('textarea'); 
-  textArea.id = "ai-result-box"; 
-  textArea.placeholder = "1. Answer one\n2. Answer two\n(Or upload image to scan)...";
+  const textArea = document.createElement('textarea'); textArea.id = "ai-result-box"; textArea.placeholder = "1. Answer one\n2. Answer two\n(Or upload image to scan)...";
   Object.assign(textArea.style, { width: "100%", height: "120px", marginTop: "10px", padding: "10px", borderRadius: "8px", border: "1px solid #4fc3f7", fontFamily: "sans-serif" });
-  
-  const submitBtn = createButton("CHECK ANSWERS", "btn-know"); 
-  submitBtn.style.display = "block"; 
-  submitBtn.style.width = "100%";
-  
-  const resultsDiv = document.createElement('div');
-  resultsDiv.id = "exam-results";
-  resultsDiv.style.marginTop = "20px";
+  const submitBtn = createButton("CHECK ANSWERS", "btn-know"); submitBtn.style.display = "block"; submitBtn.style.width = "100%";
+  const resultsDiv = document.createElement('div'); resultsDiv.id = "exam-results"; resultsDiv.style.marginTop = "20px";
   
   scanBtn.onclick = () => { if (fileInput.files.length === 0) return alert("Select image!"); attemptGeminiScan(fileInput.files[0], "gemini-3-pro-preview", textArea, scanBtn, submitBtn); };
-  
   submitBtn.onclick = () => { 
-    const fullText = textArea.value;
-    if (!fullText.trim()) return alert("Please type an answer or upload an image.");
-
+    const fullText = textArea.value; if (!fullText.trim()) return alert("Please type an answer or upload an image.");
     resultsDiv.innerHTML = "<h3 style='color:#01579b'>Exam Results</h3>";
-    
-    // Strict Parsing
-    const parsedAnswers = {};
-    const regex = /(?:^|\n|\s)(\d+)[\.\)]\s*(.*?)(?=(?:\n\s*\d+[\.\)])|$)/gs;
-    let match;
-    while ((match = regex.exec(fullText)) !== null) {
-        parsedAnswers[match[1]] = match[2].trim().toLowerCase();
-    }
-    
+    const parsedAnswers = {}; const regex = /(?:^|\n|\s)(\d+)[\.\)]\s*(.*?)(?=(?:\n\s*\d+[\.\)])|$)/gs; let match;
+    while ((match = regex.exec(fullText)) !== null) { parsedAnswers[match[1]] = match[2].trim().toLowerCase(); }
     let correctCount = 0;
-    
     questionData.forEach((q, idx) => {
-        const qNum = (idx + 1).toString();
-        const extractedAnswer = parsedAnswers[qNum] || ""; 
+        const qNum = (idx + 1).toString(); const extractedAnswer = parsedAnswers[qNum] || ""; 
         const requiredGroups = parseKeywords(q.keyword);
-        const allGroupsMatched = requiredGroups.every(group => 
-            group.some(variant => extractedAnswer.includes(variant))
-        );
-        
-        const passed = allGroupsMatched;
-        if (passed) correctCount++;
-        
-        const statusIcon = passed ? "✅" : "❌";
-        const color = passed ? "#43a047" : "#ef5350";
-        const foundText = extractedAnswer ? `"${extractedAnswer.substring(0, 50)}${extractedAnswer.length>50?'...':''}"` : "<i>(No text found)</i>";
-        
-        resultsDiv.innerHTML += `
-            <div style="text-align:left; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
-                <b style="color:${color}">${statusIcon} Q${idx+1}</b>
-                <div style="font-size:12px; color:#555;">Found: ${foundText}</div>
-            </div>
-        `;
+        const allGroupsMatched = requiredGroups.every(group => group.some(variant => extractedAnswer.includes(variant)));
+        const passed = allGroupsMatched; if (passed) correctCount++;
+        const statusIcon = passed ? "✅" : "❌"; const color = passed ? "#43a047" : "#ef5350"; const foundText = extractedAnswer ? `"${extractedAnswer.substring(0, 50)}${extractedAnswer.length>50?'...':''}"` : "<i>(No text found)</i>";
+        resultsDiv.innerHTML += `<div style="text-align:left; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;"><b style="color:${color}">${statusIcon} Q${idx+1}</b><div style="font-size:12px; color:#555;">Found: ${foundText}</div></div>`;
     });
-    
     const scorePct = Math.round((correctCount / questionData.length) * 100);
     resultsDiv.innerHTML = `<h2 style="color:${scorePct >= 50 ? '#43a047' : '#ef5350'}">Score: ${correctCount}/${questionData.length} (${scorePct}%)</h2>` + resultsDiv.innerHTML;
-    
-    const retryBtn = createButton("Retry Exam", "btn-peek");
-    retryBtn.style.marginTop = "10px";
-    retryBtn.onclick = () => renderAIExam(); 
-    resultsDiv.appendChild(retryBtn);
+    const retryBtn = createButton("Retry Exam", "btn-peek"); retryBtn.style.marginTop = "10px"; retryBtn.onclick = () => renderAIExam(); resultsDiv.appendChild(retryBtn);
   };
-  
   container.append(fileInput, scanBtn, textArea, submitBtn, resultsDiv);
 }
 
-// --- UTILS ---
+// --- UTILS & AUDIO ---
 async function attemptGeminiScan(file, modelId, textArea, scanBtn, submitBtn) {
   scanBtn.innerText = `...`;
   try {
@@ -676,12 +540,29 @@ async function attemptGeminiScan(file, modelId, textArea, scanBtn, submitBtn) {
   } catch (e) { alert(e.message); scanBtn.innerText = "Error"; }
 }
 
-function speakText(text) { if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); }}
+function speakText(text) { 
+    pauseMusicTemp(); // Pause music for TTS
+    if ('speechSynthesis' in window) { 
+        window.speechSynthesis.cancel(); 
+        const u = new SpeechSynthesisUtterance(text);
+        u.onend = () => resumeMusicTemp(); // Resume after TTS
+        window.speechSynthesis.speak(u); 
+    } else { resumeMusicTemp(); }
+}
+
 function createButton(text, className) { const b = document.createElement('button'); b.innerHTML = text; b.className = "ghost-btn " + className; return b; }
+
 function toggleVoice(input, k, batchData) { 
+    pauseMusicTemp(); // Pause music for mic
     if (!('webkitSpeechRecognition' in window)) return alert("No Voice API");
     recognition = new webkitSpeechRecognition(); recognition.lang = 'en-US';
-    recognition.onresult = (e) => { input.value = e.results[0][0].transcript; if(e.results[0].isFinal) checkBatchMatch(input.value, batchData, k, "Typed"); };
+    // MODIFIED: Voice no longer submits automatically. Just fills input.
+    recognition.onresult = (e) => { 
+        input.value = e.results[0][0].transcript; 
+        input.dispatchEvent(new Event('input')); // Trigger visual updates
+    };
+    recognition.onend = () => resumeMusicTemp(); // Resume after mic
     recognition.start();
 }
+
 function shakeInput(el) { el.style.transform = "translateX(5px)"; setTimeout(() => el.style.transform = "translateX(-5px)", 50); setTimeout(() => el.style.transform = "translateX(0)", 100); }
